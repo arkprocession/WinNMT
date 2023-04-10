@@ -1,6 +1,6 @@
-# WinNMT (Windows Network Mapping Tool)
+# WinNMT (Windows Advanced Share & Network Mapping Tool)
 
-WinNMT (Network Mapping Tool)
+WinNMT (Windows Advanced Share & Network Mapping Tool)
 
 
 This is a Python script that provides a Graphical User Interface (GUI) for mapping network drives and sharing folders on Windows operating system.

@@ -12,3 +12,5 @@ The mapping of network drives is executed using the net use command, while the s
 The GUI logs the output of the operations performed, making it easy to track any issues that may arise. The script includes methods for handling user input, starting and stopping threads, and resetting input fields after an operation has been executed.
 
 Overall, this script offers a convenient and efficient way to map network drives and share folders on Windows operating system.
+
+In the latest version (v1.1), WinNMT has added the functionality to retrieve shared drives and mapped drives and display them in a list in the GUI. Users can visualize the shared and mapped drives and unshare or unmap them accordingly. This new feature improves the overall functionality of the tool by providing an easy way to manage existing shared and mapped drives.

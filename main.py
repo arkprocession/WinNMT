@@ -18,6 +18,25 @@ from PyQt5.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame, QGrid
                               QPushButton, QTextEdit, QVBoxLayout, QWidget, QTableWidget, QHeaderView)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 

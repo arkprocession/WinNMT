@@ -9,12 +9,15 @@ import sys
 from subprocess import CREATE_NO_WINDOW
 from mapdrivethread import MapDriveThread
 from sharefolderthread import ShareFolderThread
+import win32net
 
 # Third-party imports
 from PyQt5.QtCore import pyqtSlot, QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame, QGridLayout, QLabel, QLineEdit, QMessageBox, 
-                              QPushButton, QTextEdit, QVBoxLayout, QWidget, QTableWidget, QHeaderView)
+                              QPushButton, QTextEdit, QVBoxLayout, QWidget, QTableWidget, QHeaderView, QTableWidgetItem, QGroupBox)
+                              
+
 
 
 # Define the NetworkDriveMapper class
@@ -38,11 +41,14 @@ class NetworkDriveMapper(QWidget):
         # Connect signals and slots for the widgets
         self.connect_signals_and_slots()
 
+        # Call the retrieve_mapped_drives and retrieve_shared_folders methods on program start
+        self.retrieve_shared_folders()
+        self.retrieve_mapped_drives()
 
     # Method to configure the window's properties
     def configure_window(self):
         self.setWindowTitle("Network Mapping Tool")
-        self.setFixedSize(1000, 500)
+        self.setFixedSize(1000, 1000)
 
 
     # Method to set the style sheet for the application
@@ -90,7 +96,7 @@ class NetworkDriveMapper(QWidget):
         self.shared_input.setPlaceholderText("Enter shared folder name")
         
         # Create and configure the "Drive letter" label and dropdown
-        self.drive_label = QLabel("Drive letter:")
+        self.drive_label = QLabel("Name:")
         self.drive_dropdown = QComboBox()
         self.drive_dropdown.addItems(self.get_available_drives())
         
@@ -107,76 +113,108 @@ class NetworkDriveMapper(QWidget):
         self.stop_button = QPushButton("Stop")
         self.stop_button.setIcon(QIcon("stop_icon.png"))
         self.stop_button.setEnabled(False)
-
-        
-        #Create and configure the "Log" label
-        self.log_label = QLabel("Log:")
         
         # Create and configure the log widget (read-only text area)
         self.log_widget = QTextEdit()
         self.log_widget.setReadOnly(True)
-        
-        # Create and configure the "Mapped Drives" label
-        self.mapped_drives_label = QLabel("Mapped Drives:")
 
         # Create and configure the mapped drives table
+        self.shared_drives_table = QTableWidget()
+        self.shared_drives_table.setColumnCount(2)
+        self.shared_drives_table.setHorizontalHeaderLabels(["Name", "Remote Path"])
+        self.shared_drives_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.shared_drives_table.verticalHeader().setVisible(False)
+        self.shared_drives_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.shared_drives_table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        # Create and configure the "Disconnect" button
+        self.disconnect_button = QPushButton("Unshare")
+        self.disconnect_button.setIcon(QIcon("disconnect_icon.png"))
+        
+        # Create and configure the "Clear Log" button
+        self.clear_log_button = QPushButton("Clear Log")
+        self.clear_log_button.setIcon(QIcon("clear_icon.png"))
+        
+        self.retrieve_shared_button = QPushButton("Refresh Shared Folders")
+        
+        
+          # Create and configure the mapped drives table
         self.mapped_drives_table = QTableWidget()
-        self.mapped_drives_table.setColumnCount(3)
-        self.mapped_drives_table.setHorizontalHeaderLabels(["Drive Letter", "Remote Path", "Status"])
+        self.mapped_drives_table.setColumnCount(2)
+        self.mapped_drives_table.setHorizontalHeaderLabels(["Name", "Remote Path"])
         self.mapped_drives_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.mapped_drives_table.verticalHeader().setVisible(False)
         self.mapped_drives_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.mapped_drives_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
-        # Create and configure the "Disconnect" button
-        self.disconnect_button = QPushButton("Disconnect")
-        self.disconnect_button.setIcon(QIcon("disconnect_icon.png"))
 
-        # Create and configure the "Search" label and input field
-        self.search_label = QLabel("Search:")
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search for mapped drives")
-
-        # Create and configure the "Help" button
-        self.help_button = QPushButton("Help")
-        self.help_button.setIcon(QIcon("help_icon.png"))
+        # Create and configure the "Retrieve Mapped Drives" button
+        self.retrieve_mapped_drives_button = QPushButton("Refresh Mapped Drives")
         
-        # Create and configure the "Clear Log" button
-        self.clear_log_button = QPushButton("Clear Log")
-        self.clear_log_button.setIcon(QIcon("clear_icon.png"))
+        # Create and configure the "Disconnect Mapped Drive" button
+        self.disconnect_mapped_drive_button = QPushButton("Unmap")
          
          
-    # Create a layout for the widgets   
     def create_layout(self):
+
+        layout = QVBoxLayout()
+
+        # Share folder section
+        share_folder_layout = QGridLayout()
+        share_folder_group = QGroupBox("Share Folder")
+        share_folder_layout.addWidget(self.adv_shared_path_label, 0, 0)
+        share_folder_layout.addWidget(self.adv_shared_path_input, 0, 1)
+        share_folder_layout.addWidget(self.browse_button, 0, 2)
+        share_folder_layout.addWidget(self.add_adv_shared_button, 0, 3)
+        share_folder_group.setLayout(share_folder_layout)
+        layout.addWidget(share_folder_group)
+
+        # Map network drive section
+        map_network_drive_layout = QGridLayout()
+        map_network_drive_group = QGroupBox("Map Network Drive")
+        map_network_drive_layout.addWidget(self.ip_label, 0, 0)
+        map_network_drive_layout.addWidget(self.ip_input, 0, 1)
+        map_network_drive_layout.addWidget(self.shared_input, 1, 1)
+        map_network_drive_layout.addWidget(self.drive_label, 2, 0)
+        map_network_drive_layout.addWidget(self.drive_dropdown, 2, 1)
+        map_network_drive_layout.addWidget(self.connect_button, 0, 2, 2, 1)
+        map_network_drive_layout.addWidget(self.refresh_button, 2, 2)
+        map_network_drive_layout.addWidget(self.stop_button, 2, 3)
+        map_network_drive_group.setLayout(map_network_drive_layout)
+        layout.addWidget(map_network_drive_group)
+
+
+
+        # Shared folder section
+        shared_drives_layout = QVBoxLayout()
+        shared_drives_group = QGroupBox("Shared Folders")
+        shared_drives_layout.addWidget(self.shared_drives_table)
+        shared_drives_layout.addWidget(self.retrieve_shared_button)
+        shared_drives_layout.addWidget(self.disconnect_button)
+        shared_drives_group.setLayout(shared_drives_layout)
+        layout.addWidget(shared_drives_group)
+
+        # Mapped drives section
+        mapped_drives_layout = QVBoxLayout()
+        mapped_drives_group = QGroupBox("Mapped Drives")
+        mapped_drives_layout.addWidget(self.mapped_drives_table)
+        mapped_drives_layout.addWidget(self.retrieve_mapped_drives_button)
+        mapped_drives_layout.addWidget(self.disconnect_mapped_drive_button)
+        mapped_drives_group.setLayout(mapped_drives_layout)
+        layout.addWidget(mapped_drives_group)
+
+        # Log section
+        log_layout = QVBoxLayout()
+        log_group = QGroupBox("Log")
+        log_layout.addWidget(self.log_widget)
+        log_layout.addWidget(self.clear_log_button)
+        log_group.setLayout(log_layout)
+        layout.addWidget(log_group)
         
-        layout = QGridLayout()
-
-        # Add widgets to the layout
-        layout.addWidget(self.adv_shared_path_label, 0, 0)  # "Select directory to share" label
-        layout.addWidget(self.adv_shared_path_input, 0, 1)  # Directory input field
-        layout.addWidget(self.browse_button, 0, 2)  # Browse button
-        layout.addWidget(self.add_adv_shared_button, 0, 3)  # Share/Create button
-        layout.addWidget(self.separator_line, 1, 0, 1, 4)  # Separator line
-        layout.addWidget(self.ip_label, 2, 0)  # IP address label
-        layout.addWidget(self.ip_input, 2, 1)  # IP address input field
-        layout.addWidget(self.shared_label, 3, 0)  # Shared folder label
-        layout.addWidget(self.shared_input, 3, 1)  # Shared folder input field
-        layout.addWidget(self.drive_label, 4, 0)  # Drive letter label
-        layout.addWidget(self.drive_dropdown, 4, 1)  # Drive letter dropdown
-        layout.addWidget(self.connect_button, 2, 2, 2, 1)  # Map network drive button
-        layout.addWidget(self.refresh_button, 4, 2)  # Refresh button
-        layout.addWidget(self.stop_button, 4, 3)  # Stop button
-        layout.addWidget(self.log_label, 5, 0)  # Log label
-        layout.addWidget(self.log_widget, 6, 0, 1, 4)  # Log widget (text area)
-        layout.addWidget(self.mapped_drives_label, 7, 0)  # Mapped drives label
-        layout.addWidget(self.mapped_drives_table, 8, 0, 1, 3)  # Mapped drives table
-        layout.addWidget(self.disconnect_button, 8, 3)  # Disconnect button
-        layout.addWidget(self.search_label, 9, 0)  # Search label
-        layout.addWidget(self.clear_log_button, 9, 3)  # Clear Log button
-
+        
         # Set the layout for the window
         self.setLayout(layout)
-    
+
   
     # Define the connected signals here
     def connect_signals_and_slots(self):
@@ -197,6 +235,16 @@ class NetworkDriveMapper(QWidget):
         
         # Connect the Clear Log button to a slot
         self.clear_log_button.clicked.connect(self.clear_log)
+        
+        self.retrieve_shared_button.clicked.connect(self.retrieve_shared_folders)
+
+        self.disconnect_button.clicked.connect(self.on_disconnect_button_clicked)
+        
+        
+        # Connect the Retrieve Mapped Drives button to a slot
+        self.retrieve_mapped_drives_button.clicked.connect(self.retrieve_mapped_drives)
+        # Connect the Disconnect Mapped Drive button to a slot
+        self.disconnect_mapped_drive_button.clicked.connect(self.on_disconnect_mapped_drive_button_clicked)
     
     
     def clear_log(self):
@@ -279,7 +327,8 @@ class NetworkDriveMapper(QWidget):
     def share_folder_thread_finished(self):
         self.add_adv_shared_button.setEnabled(True)
         self.connect_button.setEnabled(True)
-
+    # Call the retrieve_shared_folders method to update the table
+        self.retrieve_shared_folders()
 
     # Start the drive mapping thread
     def connect_drive_thread(self):
@@ -340,6 +389,9 @@ class NetworkDriveMapper(QWidget):
 
             else:
                 self.log_widget.append(f"Failed to map network drive: {output}")
+        
+        # Call the retrieve_mapped_drives method to update the table
+        self.retrieve_mapped_drives()        
     
     
     #Stop the map drive thread
@@ -350,3 +402,99 @@ class NetworkDriveMapper(QWidget):
             self.map_drive_thread_running = False
             self.log_message("Stopped mapping network drive.")
             self.map_drive_thread_finished()
+            
+            
+    def retrieve_shared_folders(self):
+        # Retrieve shared folder information
+        server = None  # Use the local computer
+        level = 2  # Level 2 contains the share name, type, and other details
+        resume_handle = 0
+
+        shared_folders, _, _ = win32net.NetShareEnum(server, level, resume_handle)
+
+        # Filter out IPC$ shares
+        shared_folders = [folder for folder in shared_folders if folder["netname"] != "IPC$"]
+
+        if not shared_folders:
+            self.log_message("No shared folders found.")
+            self.shared_drives_table.setRowCount(0)  # Clear the table
+            return
+
+        self.shared_drives_table.setRowCount(len(shared_folders))
+
+        for index, folder in enumerate(shared_folders):
+            share_name, local_path = folder["netname"], folder["path"]
+
+            self.shared_drives_table.setItem(index, 0, QTableWidgetItem(share_name))
+            self.shared_drives_table.setItem(index, 1, QTableWidgetItem(local_path))
+            self.shared_drives_table.setItem(index, 2, QTableWidgetItem("Shared"))
+
+                
+                
+    @pyqtSlot()
+    def on_disconnect_button_clicked(self):
+        selected_rows = self.shared_drives_table.selectionModel().selectedRows()
+        if not selected_rows:
+            self.log_message("No shared folder selected for disconnecting.")
+            return
+
+        for row in selected_rows:
+            shared_folder = self.shared_drives_table.item(row.row(), 0).text()
+            result = subprocess.run(f"net share {shared_folder} /delete", shell=True, text=True, capture_output=True)
+            if result.returncode == 0:
+                self.log_message(f"Shared folder '{shared_folder}' has been disconnected.")
+                self.shared_drives_table.removeRow(row.row())
+            else:
+                self.log_message(f"Failed to disconnect shared folder '{shared_folder}': {result.stderr}")
+                
+                
+     # Method to retrieve mapped network drives
+    def retrieve_mapped_drives(self):
+        server = None  # Use the local computer
+        level = 1  # Level 1 contains the local and remote path
+
+        mapped_drives, _, _ = win32net.NetUseEnum(server, level)
+
+        if not mapped_drives:
+            self.log_message("No mapped drives found.")
+            self.mapped_drives_table.setRowCount(0)  # Clear the table
+            return
+
+        self.mapped_drives_table.setRowCount(len(mapped_drives))
+
+        for index, drive in enumerate(mapped_drives):
+            local_name, remote_name = drive["local"], drive["remote"]
+
+            self.mapped_drives_table.setItem(index, 0, QTableWidgetItem(local_name))
+            self.mapped_drives_table.setItem(index, 1, QTableWidgetItem(remote_name))
+
+                
+    @pyqtSlot()
+    def on_disconnect_mapped_drive_button_clicked(self):
+        selected_rows = self.mapped_drives_table.selectionModel().selectedRows()
+        if not selected_rows:
+            self.log_message("No mapped drive selected for disconnecting.")
+            return
+
+        for row in selected_rows:
+            mapped_drive = self.mapped_drives_table.item(row.row(), 0).text()
+            result = subprocess.run(f"net use {mapped_drive} /delete", shell=True, text=True, capture_output=True)
+            if result.returncode == 0:
+                self.log_message(f"Mapped drive '{mapped_drive}' has been disconnected.")
+                self.mapped_drives_table.removeRow(row.row())
+            else:
+                self.log_message(f"Failed to disconnect mapped drive '{mapped_drive}': {result.stderr}")
+
+                
+    def closeEvent(self, event):
+        confirm_box = QMessageBox()
+        confirm_box.setWindowTitle("Confirm Exit")
+        confirm_box.setText("Are you sure you want to exit?")
+        confirm_box.setIcon(QMessageBox.Question)
+        confirm_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        confirm_box.setDefaultButton(QMessageBox.No)
+        reply = confirm_box.exec_()
+        if reply == QMessageBox.Yes:
+            event.accept()
+        else:
+            event.ignore()
